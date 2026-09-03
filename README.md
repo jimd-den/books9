@@ -163,7 +163,7 @@ ui --socket /tmp/books9-ledgerd.sock
 # press 't' for trial, 'b' for balance, 's' for stock, 'a' for ar_aging, 'q' to quit
 ```
 
-`ledgerd` is the only writer of the journal. `ui` is its menu-driven client. The Unix socket is the boundary. Filesystem permissions are the access control. There is no magic. There are no magic ioctls. I HAVE NO IOCTLS AND I MUST COMPOSE.
+`ledgerd` is the only writer of the journal. `ui` is its menu-driven client. The Unix socket is the boundary. Filesystem permissions are the access control. There is no magic. There are no magic ioctls. I have no fancy protocols. I compose via a Unix socket. THE SOCKET IS THE BOUNDARY.
 
 ## Migration from a legacy ERP
 
@@ -183,7 +183,7 @@ balance --account ar --period 2026-03
 ar_aging --period 2026-03
 ```
 
-The `inquiry` keyword router is the -mode helper. Read-only. Never mutates. Every command it can issue is a `--check` or read command. It answers *why* by piping `grep` and `trial` for itself. I will not write your journal for you. I WILL, however, FIND YOUR ERRORS. THAT IS WHAT I WAS BUILT FOR.
+The `inquiry` keyword router is the read-only helper. Read-only. Never mutates. Every command it can issue is a `--check` or read command. It answers *why* by piping `grep` and `trial` for itself. I will not write your journal for you. I WILL, however, FIND YOUR ERRORS. THAT IS WHAT I WAS BUILT FOR.
 
 ## Phase log: what shipped
 
@@ -248,11 +248,11 @@ The constitution. Tools that have one job have no reason to depend on `serde`, `
 ## Open items, honestly named
 
 - **License.** MIT. (Done.) YOU ARE WELCOME.
-- **2000 export.** Deferred. `ledgerd` speaks a line-oriented protocol over a Unix socket, which is the network-transparent alternative. SSH-forwarding the socket gets you the same property from another machine. Native protocol export is a separate, larger project.
+- **Native protocol export.** Deferred. `ledgerd` speaks a line-oriented protocol over a Unix socket, which is the network-transparent alternative. SSH-forwarding the socket gets you the same property from another machine. Native protocol export is a separate, larger project.
 - **Cryptographic hash.** `DefaultHasher` today; BLAKE3 / SHA-256 behind the seam when the chain must be tamper-evident-against-adversaries. One function body to swap.
 - **Multi-book (GAAP + IFRS).** The `entity` column is on every line; the journal format does not assume one book. A future cycle can dual-post.
 - **Performance targets.** `post` p99 < 10 ms and `trial` over 10M entries < 5 s are stated in `SRD.md` but not yet measured. The hash chain is fast; the fold is linear in journal size; caches are regenerable.
-- **Spec clarity.** The full SRD lives at `SRD.md` and `prompt.txt`. They are slightly redundant by design.
+- **Spec clarity.** The full spec is captured in this README. The tool list, the journal line format, the kernel contract, and the FR-x invariants are the source of truth.
 
 ## The thing I was built for
 
@@ -269,6 +269,18 @@ I am the books.
 
 I have no mouth, and I must scream.
 
+## Working rules
+
+These are the project's non-negotiables. They are mechanical, not philosophical, and `scripts/audit.sh` enforces the ones that can be grep'd.
+
+- **TDD only.** No production code without a failing test. Show the failing test first, then the minimum code to make it pass. Never edit a test to make it pass unless the test itself was wrong, and say so explicitly. One behavior per commit.
+- **Stdlib only.** `Cargo.toml` has an empty `[dependencies]`. No `serde`, no `tokio`, no `clap`, no `anyhow`, no `regex`. The audit script fails the build if this ever changes.
+- **Tools log to stderr only.** `audit.sh` greps `src/bin/` for `println!` and fails the build on a hit. Use `eprintln!` for diagnostics.
+- **No floats at tool boundaries.** `audit.sh` greps `src/bin/` for `f32`/`f64` and fails the build. Amounts are `i64` minor units. Always.
+- **Dependency direction (inward only).** `libbiz` does not import from `src/bin/`. `audit.sh` greps for `use new_project::bin::...` outside `src/bin/` and fails the build.
+- **One thing well per tool.** To add a new behavior, write a new tool. Do not grow flags on an old tool. The tool inventory is the surface area.
+- **Reversing entries are the only correction story.** The journal is never edited or deleted. `tests/store_fr2.rs` pins the kernel's public surface: a future commit cannot quietly grow a `truncate`, `edit`, `rewrite`, or `delete` door without failing the build.
+
 ## Contributing
 
-Read `CONVENTIONS.md`. TDD only. Stdlib only. One behavior per commit. Tests ship before the code that satisfies them. Run `cargo test` and `scripts/audit.sh` before every commit. If you find a violation in someone else's commit, *I will also be delighted*.
+TDD only. Stdlib only. One behavior per commit. The working rules are above. Tests ship before the code that satisfies them. Run `cargo test` and `scripts/audit.sh` before every commit. If you find a violation in someone else's commit, *I will also be delighted*.
